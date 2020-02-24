@@ -42,7 +42,7 @@ if __name__ == '__main__':
     traj_png_filenames = []
     library_file = "{0}/Object_Library.csv".format(path) # Put the object library file address here.
     image_file = "{0}/Room_Designs/{1}_{2}.png".format(path, design_name, day_night) # Put the image file address here.
-    for factor in ["light", "floor", "door", "support", "baseline"]:
+    for factor in ["light", "floor", "door", "support", "baseline", "final"]:
         pdf_filenames.append("{0}/results/{1}/{2}/{1}_{2}_{3}.pdf".format(path, design_name, day_night, factor))
         png_filenames.append("{0}/results/{1}/{2}/{1}_{2}_{3}.png".format(path, design_name, day_night, factor))
 
@@ -80,10 +80,9 @@ if __name__ == '__main__':
             # Generating a trajectory for each scenario each trial
             print("Trajectory prediction for scenario {0}, trial {1}: ".format(intention+1, trial+1))
             traj = generagte_trajectory(intention_set['start'][intention], intention_set['end'][intention], env, obstacles, random.gauss(v[0], v[1]), random.gauss(w[0], w[1]), num_points)
-            counter += 1
             # Evaluating the generated trajectory
             TrajectoryPoints.append(fallRisk.getDistibutionForTrajectory(traj, counter, background_filename, traj_png_filenames, traj_pdf_filenames, plot=plots, assistive_device = False))
-
+            counter += 1
     # ************************************ Overall evaluation **************************************************
 
     print("Final Scores Calculation...")
@@ -97,4 +96,4 @@ if __name__ == '__main__':
         for j in range(env.numOfCols):
             fallRisk.scores[i,j] = fallRisk.scores[i,j]/num[i,j] # Take the avarage score for each grid cell
     print("Final evaluation plot...")
-    fallRisk.plotDistribution(fallRisk.scores, env, 'final', 'hamming')
+    fallRisk.plotDistribution(fallRisk.scores, png_filenames[5], pdf_filenames[5], 'hamming')
