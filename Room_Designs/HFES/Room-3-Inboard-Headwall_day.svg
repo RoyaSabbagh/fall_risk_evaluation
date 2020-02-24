@@ -14,7 +14,7 @@
    viewBox="0 0 1322.9166 1322.9167"
    version="1.1"
    id="svg8"
-   inkscape:version="0.92.4 (5da689c313, 2019-01-14)"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)"
    sodipodi:docname="Room-3-Inboard-Headwall_day.svg">
   <defs
      id="defs2">
@@ -47,16 +47,16 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.49497475"
-     inkscape:cx="2225.8285"
-     inkscape:cy="3233.4155"
+     inkscape:zoom="0.35"
+     inkscape:cx="2919.4509"
+     inkscape:cy="3697.64"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1-6"
      showgrid="false"
-     inkscape:window-width="2736"
-     inkscape:window-height="1699"
-     inkscape:window-x="-13"
-     inkscape:window-y="2147"
+     inkscape:window-width="1853"
+     inkscape:window-height="1025"
+     inkscape:window-x="67"
+     inkscape:window-y="27"
      inkscape:window-maximized="1"
      units="px" />
   <metadata
@@ -67,7 +67,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -4256,7 +4256,7 @@
          style="overflow:hidden;opacity:1;fill:none;fill-opacity:0.96600569;stroke:#000000;stroke-width:3.83033442;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.39215686;paint-order:stroke fill markers"
          transform="matrix(0.98484626,-0.17342964,0.17386696,0.98476915,0,0)" />
       <g
-         transform="matrix(0.05600858,0,0,0.05600858,1261.6088,-1314.0373)"
+         transform="matrix(0.05462564,-0.01236933,0.01236933,0.05462564,1255.017,-1305.7859)"
          id="g19524"
          style="stroke-width:1.2147373">
         <rect

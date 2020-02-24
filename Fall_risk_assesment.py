@@ -18,25 +18,23 @@ from shapely.geometry import Point, Polygon
 class Environment_Image():
 
 	""" This a class to define the environment in a room to be used in the FallRiskAssesment class."""
-	def __init__(self):
+	def __init__(self, image_file_name,library_file_name, unit_size_m, num_rows, num_cols):
 
-		self.unit_size_m = 0.10 # Grid size in cm (X,Y).
-		self.numOfRows = 100 # Number of grids in a Y direction.
-		self.numOfCols = 100 # Number of grids in a X direction.
+		self.unit_size_m = unit_size_m # Grid size in cm (X,Y).
+		self.numOfRows = num_rows # Number of grids in a Y direction.
+		self.numOfCols = num_cols # Number of grids in a X direction.
 		self.occupied = np.zeros([self.numOfCols, self.numOfRows]) # Initializing occupied as a zero matrix with size of number_of_rows * number_of_columns. When a grid is occupied, its corresponding value in this matrix is one, otherwise it is zero.
 
-		library_file_name = "/home/roya/catkin_ws/src/Risk_Aware_Planning/Object_Library.csv" # Put the object library file address here.
-		image_file_name = "/home/roya/catkin_ws/src/Risk_Aware_Planning/Room_Designs/Room-3-Inboard-Headwall_day.png" # Put the image file address here.
-		self.rooms, self.objects, self.sitting_zones, self.walls, self.doors, self.lights= read_blueprint(image_file_name, library_file_name) # Reading floor plan and finding room sections, objects, walls, doors and lights.
+		self.rooms, self.objects, self.sample_zones, self.walls, self.doors, self.lights= read_blueprint(image_file_name, library_file_name) # Reading floor plan and finding room sections, objects, walls, doors and lights.
 
 		self.floor = np.zeros([self.numOfRows, self.numOfCols]) # Initializing floor_type as a zero matrix with size of number_of_rows * number_of_columns.
 		for room in self.rooms:
 			for row in range(self.numOfRows):
 				for col in range(self.numOfCols):
-					gridCoordinate = self.grid2meter(col,row)
+					gridCoordinate = self.grid2meter(row,col)
 					gridPoint = Point(gridCoordinate)
 					if gridPoint.within(room.polygon): # Assigning the floor type based on the room section to each grid in the space
-						self.floor[col, row] = room.surfaceRisk
+						self.floor[row, col] = room.surfaceRisk
 
 	def grid2meter(self, col, row):
 		x = col*self.unit_size_m
@@ -51,24 +49,20 @@ class FallRiskAssesment():
 
 	def __init__(self, env):
 		self.env = env # env is an Environment class.
-		self.scores = np.zeros([self.env.numOfCols,self.env.numOfRows]) # Initializing scores as a zero matrix with size of number_of_rows * number_of_columns.
-		self.scores_light = np.zeros([self.env.numOfCols,self.env.numOfRows])
-		self.scores_door = np.zeros([self.env.numOfCols,self.env.numOfRows])
-		self.scores_support = np.zeros([self.env.numOfCols,self.env.numOfRows])
-		self.scores_floor = np.zeros([self.env.numOfCols,self.env.numOfRows])
+		self.scores = np.zeros([self.env.numOfRows,self.env.numOfCols]) # Initializing scores as a zero matrix with size of number_of_rows * number_of_columns.
+		self.scores_light = np.zeros([self.env.numOfRows,self.env.numOfCols])
+		self.scores_door = np.zeros([self.env.numOfRows,self.env.numOfCols])
+		self.scores_support = np.zeros([self.env.numOfRows,self.env.numOfCols])
+		self.scores_floor = np.zeros([self.env.numOfRows,self.env.numOfCols])
 		self.theta_d = [0.8,0.8,1.5] # [f_min, d_min, d_max] used in the supporting object factor
 		self.theta_l = [100,500,1000] # [night_min, night_max/day_min, day_max] used in the light factor
-		self.theta_r = 1 #
-		self.theta_v = 1 #
 		self.ESP = [] # Initializing External Supporting Point list as an empty array.
-		self.occupied = np.zeros([self.env.numOfRows, self.env.numOfCols])
+		self.occupied = np.zeros([self.env.numOfRows, self.env.numOfCols])  # Initializing occupied cells as zeros, once found that a cell is occupied it will change to 1
 		for obj in self.env.objects:
-			# print(obj.name)
-			# print(obj.conf)
-			self.update_ESP(obj) # For each object in list of objects, the surrounding grids are updated basd on support level of the object.
+			self.update_ESP(obj) # For each object in list of objects, the surrounding grids are updated based on support level of the object.
 
 	def update_ESP(self, obj):
-		"""In this function, we find the effect of the input object on all the grids in the environment. When a grid is occupied we find from which direction it is free and add that as a External Supporting Point, if it not free from any direction, it is not added as a ESP and only it is marked as an occupied cell."""
+		"""In this function, we find the effect of the input object on all the grids in the environment. When a grid is occupied we find from which direction it is free and add that as a External Supporting Point, if it is not free from any direction, it is not added as a ESP and only it is marked as an occupied cell."""
 		for row in range(self.env.numOfRows):
 			for col in range(self.env.numOfCols):
 				coordinate = self.grid2meter([row, col]) # Changing grid to meter coordinate system
@@ -93,29 +87,28 @@ class FallRiskAssesment():
 					self.occupied[row, col] = 1
 
 	def findFactors(self, grid):
-		# print(grid)
 		gridCoordinate = self.grid2meter(grid)
 		gridPoint = Point(gridCoordinate)
-
 		self.scores_support[grid[0],grid[1]] = copy.deepcopy(self.closestSupportDistance_effect(gridPoint)) # Adding the effect of ESP on this grid.
 		self.scores_floor[grid[0],grid[1]] = copy.deepcopy(self.floor_effect(grid)) # Adding the effect of ESP on this grid.
 		self.scores_light[grid[0],grid[1]] = copy.deepcopy(self.lighting_effect(gridPoint)) # Adding the effect of lighting on this grid.
 		self.scores_door[grid[0],grid[1]] = copy.deepcopy(self.door_passing_effect(gridPoint)) # Adding the effect of door passing on this grid.
-		# print(self.scores_light[grid[0],grid[1]])
 
 	def floor_effect(self,grid):
+		""" This function calculates the effect of floor type for a given grid. First it is initialized by the value
+		for the floor type for that grid itself. Then, if there is any transition in the neighboring cell, the risk will increase."""
 		floorTypeRisk = self.env.floor[grid[0], grid[1]] # Initializing the effect of floor type on this grid base on its own floor type.
 		for i in [-1,1]: # Cheking if there is any transition to another type of floor or not in the surrounding grids and modifying the effect of floor type.
-			if grid[0]+i < self.env.numOfCols and grid[0]+i > 0:
+			if grid[0]+i < self.env.numOfRows and grid[0]+i > 0:
 				if self.env.floor[grid[0]+i, grid[1]]!= self.env.floor[grid[0], grid[1]] and self.env.floor[grid[0]+i, grid[1]] != 0:
 					floorTypeRisk = floorTypeRisk * 1.05
-			if grid[1] + i < self.env.numOfRows and grid[1] + i > 0:
+			if grid[1] + i < self.env.numOfCols and grid[1] + i > 0:
 				if self.env.floor[grid[0], grid[1]+i]!= self.env.floor[grid[0], grid[1]] and self.env.floor[grid[0], grid[1]+i] != 0:
 					floorTypeRisk = floorTypeRisk * 1.05
 		return floorTypeRisk
 
 	def door_passing_effect(self, gridPoint):
-		""" This function calculates the effect of door passing for a given grid. It needs to be updated. """
+		""" This function calculates the effect of door passing for a given grid."""
 		risk = 0
 		for room in self.env.rooms:
 			if gridPoint.within(room.polygon) == 1:
@@ -126,7 +119,7 @@ class FallRiskAssesment():
 		return risk
 
 	def lighting_effect(self, gridPoint):
-		""" This function calculates the effect of lighting for a given grid. It needs to be updated. """
+		""" This function calculates the effect of lighting for a given grid."""
 		risk = 1
 		light_intensity = 0
 		for room in self.env.rooms:
@@ -148,7 +141,7 @@ class FallRiskAssesment():
 		return risk
 
 	def closestSupportDistance_effect(self, gridPoint):
-		""" This function calculates the effect of ESPs for a given grid. It needs to be updated. """
+		""" This function calculates the effect of ESPs for a given grid. """
 		risk = 0
 		for room in self.env.rooms:
 			if gridPoint.within(room.polygon) == 1:
@@ -228,10 +221,10 @@ class FallRiskAssesment():
 	    y = int(point[1] / self.env.unit_size_m)
 	    return [x,y]
 
-	def update(self, assistive_device):
-		""" This function updates the fall risk score based on all the factors except the trajectory. It needs to be updated. """
-		for i in range(self.env.numOfCols):
-			for j in range(self.env.numOfRows):
+	def update(self, png_filenames, pdf_filenames, assistive_device, plot):
+		""" This function updates the baseline risk score. """
+		for i in range(self.env.numOfRows):
+			for j in range(self.env.numOfCols):
 				if self.occupied[i,j] == 1:
 					self.scores[i, j] = 0.1
 				else:
@@ -241,10 +234,15 @@ class FallRiskAssesment():
 						assistive_device_risk = 1.05
 					self.findFactors([i,j])
 					self.scores[i, j] = assistive_device_risk * self.scores_light[i, j] * self.scores_floor[i, j] * self.scores_support[i, j] * self.scores_door[i, j]
-        # print self.scores
+		if plot:
+			self.plotDistribution(self.scores_light, png_filenames[0], pdf_filenames[0], 'nearest')
+			self.plotDistribution(self.scores_floor, png_filenames[1], pdf_filenames[1],  'nearest')
+			self.plotDistribution(self.scores_door, png_filenames[2], pdf_filenames[2],  'nearest')
+			self.plotDistribution(self.scores_support, png_filenames[3], pdf_filenames[3],  'nearest')
+			self.plotDistribution(self.scores, png_filenames[4], pdf_filenames[4], 'hamming')
 
 	def trajectoryRiskEstimate(self, point):
-		""" This function calculates the effect of trajectory. It needs to be updated. """
+		""" This function calculates the effect of trajectory. """
 		risk = 1
 		if point[1] == 'walking':
 			risk *= 1.2
@@ -258,14 +256,11 @@ class FallRiskAssesment():
 			risk *= 1.4
 		return risk
 
-	def getDistibutionForTrajectory(self, trajectory, counter, plot, assistive_device):
+	def getDistibutionForTrajectory(self, trajectory, counter, background_filename, traj_png_filenames, traj_pdf_filenames, plot, assistive_device):
 		""" Finding the risk distribution over a given trajectory defined by waypoints. """
-		# self.update(assistive_device)
 		TrajectoryScores = []
 		TrajectoryPoints = []
 		for point in trajectory:
-			# print point
-			# point: [[x, y, phi, v, w],"activity"]
 			grid = self.meter2grid(point[0])
 			PointScore = self.scores[grid[0],grid[1]]
 			PointScore *= self.trajectoryRiskEstimate(point)
@@ -276,10 +271,10 @@ class FallRiskAssesment():
 
 		return TrajectoryPoints
 
-	def plotDistribution(self, distribution, factor, interpolation):
+	def plotDistribution(self, distribution, png_filename, pdf_filename, interpolation):
 		fig, ax =plt.subplots()
 
-		c = ["navy", [69/float(255), 117/float(255), 180/float(255)], [116/float(255),173/float(255),209/float(255)], [171/float(255),217/float(255),233/float(255)], [224/float(255),243/float(255),248/float(255)], [255/float(255),255/float(255),191/float(255)], [254/float(255),224/float(255),144/float(255)], [253/float(255),174/float(255),97/float(255)], [244/float(255),109/float(255),67/float(255)], [215/float(255),48/float(255),39/float(255)], "firebrick"]
+		c = ["navy", [0.27,0.69,0.70], [0.45,0.68,0.82], [0.67,0.85,0.91], [0.88,0.95,0.97], [1,1,0.75], [0.99,0.88,0.56], [0.99,0.68,0.38], [0.95,0.43,0.26], [0.84,0.19,0.15], "firebrick"]
 		v = [0, 0.1, 0.17, 0.25, .32, .42, 0.52, 0.62, 0.72, 0.85, 1.]
 		l = list(zip(v,c))
 		palette=LinearSegmentedColormap.from_list('rg',l, N=256)
@@ -301,12 +296,11 @@ class FallRiskAssesment():
 		ax.set_yticks(major_ticks_y)
 		ax.set_yticks(minor_ticks_y, minor=True)
 		ax.grid(which='minor', alpha=0.4)
-		# ax.grid(which='major', alpha=0.7)
-		plt.savefig("/home/roya/Fall Risk Evaluation Results/HFES-Rooms/Room-3-Inboard-Headwall/Day/Room-3-Inboard-Headwall_day_{}.pdf".format(factor), dpi =300)
-		plt.savefig("/home/roya/Fall Risk Evaluation Results/HFES-Rooms/Room-3-Inboard-Headwall/Day/Room-3-Inboard-Headwall_day_{}.png".format(factor), dpi =300)
+		plt.savefig(png_filename, dpi =300)
+		plt.savefig(pdf_filename, dpi =300)
 		plt.show()
 
-	def plotTrajDist(self, trajFallRisk, trajectory, counter):
+	def plotTrajDist(self, trajFallRisk, trajectory, counter, background_filename, traj_png_filenames, traj_pdf_filenames):
 		x = []
 		y = []
 		dydx = []
@@ -323,29 +317,21 @@ class FallRiskAssesment():
 		segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
 		fig, ax = plt.subplots()
-		# Create a continuous norm to map from data points to colors
-		datafile = cbook.get_sample_data("/home/roya/catkin_ws/src/Risk_Aware_Planning/Room_Designs/Room-3-Inboard-Headwall_objects_rotated.png", asfileobj=False)
+		datafile = cbook.get_sample_data(background_filename, asfileobj=False)
 		im = image.imread(datafile)
 		ax.imshow(im, aspect='auto', extent=(0, 10, 0, 10), alpha=0.5, zorder=-1)
 
-		c = ["navy", [69/float(255), 117/float(255), 180/float(255)], [116/float(255),173/float(255),209/float(255)], [171/float(255),217/float(255),233/float(255)], [253/float(255),174/float(255),97/float(255)], [244/float(255),109/float(255),67/float(255)], [215/float(255),48/float(255),39/float(255)], "firebrick"]
+		c = ["navy", [0.27,0.69,0.70], [0.45,0.68,0.82], [0.67,0.85,0.91], [0.99,0.68,0.38], [0.95,0.43,0.26], [0.84,0.19,0.15], "firebrick"]
 		v = [0, 0.15, 0.3, 0.45, 0.6, 0.72, 0.85, 1.]
 		l = list(zip(v,c))
 		palette=LinearSegmentedColormap.from_list('rg',l, N=256)
 		lc = LineCollection(segments, cmap=palette, norm=plt.Normalize(0, 1.5))
-		# Set the values used for colormapping
 		lc.set_array(np.array(dydx))
 		lc.set_linewidth(4)
 		line = ax.add_collection(lc)
 		fig.colorbar(line, ax=ax)
 		plt.xlim(0, 10)
 		plt.ylim(0, 10)
-		plt.savefig("/home/roya/Fall Risk Evaluation Results/HFES-Rooms/Room-3-Inboard-Headwall/Day/Trajectories/Room-3-Inboard-Headwall_day_traj_{}.pdf".format(counter), dpi =300)
-		plt.savefig("/home/roya/Fall Risk Evaluation Results/HFES-Rooms/Room-3-Inboard-Headwall/Day/Trajectories/Room-3-Inboard-Headwall_day_traj_{}.png".format(counter), dpi =300)
-		# plt.show()
-
-#
-# env = Environment_Image()
-# fallRisk = FallRiskAssesment(env)
-# fallRisk.update(False)
-# fallRisk.plotDistribution()
+		plt.savefig(traj_png_filenames[counter], dpi =300)
+		plt.savefig(traj_pdf_filenames[counter], dpi =300)
+		plt.show()

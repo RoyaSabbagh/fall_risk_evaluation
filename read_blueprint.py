@@ -17,14 +17,16 @@ class Furniture():
         self.length = length
         self.support = support
         self.name = name
-        self.polygon = Polygon(np.squeeze(polygon))
-
+        self.polygon = Polygon([ [self.conf.x-self.length/2*np.cos(self.conf.z)-self.width/2*np.sin(self.conf.z),self.conf.y-self.length/2*np.sin(self.conf.z)+self.width/2*np.cos(self.conf.z)],
+                                    [self.conf.x-self.length/2*np.cos(self.conf.z)+self.width/2*np.sin(self.conf.z),self.conf.y-self.length/2*np.sin(self.conf.z)-self.width/2*np.cos(self.conf.z)],
+                                    [self.conf.x+self.length/2*np.cos(self.conf.z)+self.width/2*np.sin(self.conf.z),self.conf.y+self.length/2*np.sin(self.conf.z)-self.width/2*np.cos(self.conf.z)],
+                                    [self.conf.x+self.length/2*np.cos(self.conf.z)-self.width/2*np.sin(self.conf.z),self.conf.y+self.length/2*np.sin(self.conf.z)+self.width/2*np.cos(self.conf.z)] ]) # If all objects are rectangles
+        # self.polygon = Polygon(np.squeeze(polygon)) # If not all objects are rectangles
 
 class Light():
     def __init__(self, point, intensity):
         self.point = Point(point)
         self.intensity = intensity
-
 
 class Room():
     def __init__(self, polygon, surfaceRisk, name):
@@ -151,12 +153,17 @@ def find_rooms(img, noise_removal_threshold=10000, corners_threshold=0.1,
     # contour2 = np.array([[5.074, 1.672], [6.716, 1.672], [6.716, 3.736], [5.074, 3.736], [5.074, 1.672]], dtype=np.float32) # for K-B Inboard-Corner-Canted
     # contour1 = np.array([[4.136, 0.764], [7.384, 0.764], [7.384, 3.7], [7.2, 4.2], [6, 4.4], [6.4, 5.4], [4.748, 6], [4.136, 4], [4.136, 0.764]], dtype=np.float32) # for B-JH Inboard-Headwall
     # contour2 = np.array([[3.4, 4.6], [4.136, 4], [4.748, 6], [3.7, 6.404], [3.4, 4.6]], dtype=np.float32) # for for B-JH Inboard-Headwall
+
+    # if you are using obtained borders, use these lines:
     width_t = stats_old[main_room][2]+stats_old[bathroom][2]
     length_t = stats_old[main_room][3]+stats_old[bathroom][3]
+
+    # if you are using costom borders, use these lines:
     # rooms.append(Room(find_meter_from_pixel(contour1), 1, 'main_room'))
     # rooms.append(Room(find_meter_from_pixel(contour2), 1.05, 'bathroom'))
     rooms.append(Room(contour1, 1, 'main_room'))
     rooms.append(Room(contour2, 1.05, 'bathroom'))
+
     return rooms, width_t, length_t, img
 
 def find_objects(img, decodedObjects, object_library, noise_removal_threshold=5000, corners_threshold=0.1,
@@ -180,14 +187,10 @@ def find_objects(img, decodedObjects, object_library, noise_removal_threshold=50
     _, contours, _ = cv2.findContours(~img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     mask = np.zeros_like(img)
-    # objects = []
-    # for contour in contours:
-    #     if cv2.contourArea(contour)< 200000:
-    #         objects.append(contour)
 
     objects = contours
     assigned_objects = []
-    sitting_zones = {}
+    sample_zones = {}
     lights = []
     doors = []
     for QR_obj in decodedObjects:
@@ -207,51 +210,98 @@ def find_objects(img, decodedObjects, object_library, noise_removal_threshold=50
                     doors.append(new_obj)
                     print(new_obj.name)
                     print(new_obj.conf)
+                    if "11" in QR_obj.data.decode("utf-8") or "35" in QR_obj.data.decode("utf-8"):
+                        sample_zones["Main Door"] = new_obj.polygon
                 else:
                     new_obj = Furniture([find_meter_from_pixel(rect[0][0]), find_meter_from_pixel(rect[0][1]), rect[2]+0.001], find_meter_from_pixel(rect[1][0]), find_meter_from_pixel(rect[1][1]), obj_df.iloc[0]['Support Level'], find_meter_from_pixel(obj), QR_obj.data.decode("utf-8"))
                     assigned_objects.append(new_obj)
                     print(new_obj.name)
                     print(new_obj.conf)
 
-                    #Numbers for A-K-Inboard-Headwall: [4, (2,4), 3, 2, 2, 2]
-                    #Numbers for A-K-Outboard-Footwall: [1, (2,4), 1, 2, 2, 2]
-                    #Numbers for P22-Inboard-footwall and P22-Outboard-footwall: [2, (2,4), 2, 1, 2, 2]
-                    #Numbers for P22-Nested: [1, (2,4), 2, 1, 2, 2]
-                    #Numbers for S-B-Outboard-Footwall: [3, (2,4), 3, 2, 2, 2]
-                    #Numbers for J-M-Outboard-Footwall: [1, (2,4), 3, 2, 2, 2]
-                    #Numbers for J-C-Outboard-Footwall: [2, (2,4), 3, 2, 2, 2]
-                    #Numbers for J-G-Outboard-Footwall: [3, (1,3), 1, 2, 2, 2]
-                    #Numbers for B-L-Outboard-Footwall: [1, (1,3), 1, 2, 2, 2]
-                    #Numbers for B-JH-Inboard-Headwall: [2, (1,3), 1, 1, 1, 2]
-                    #Numbers for K-B-Inboard-Corner: [1, (2,4), 1, 1, 4, 2]
-                    #Numbers for Room-1: [1, (2,4), 3, 2, 2, 2]
-                    #Numbers for Room-2: [2, (2,4), 3, 4, 2, 2]
-                    #Numbers for Room-3: [3, (2,4), 2, 2, 2, 2]
-                    #Numbers for Room-4: [4, (2,4), 1, 2, 2, 2]
+                    # Numbers to be changed to detect sittable side of objects:
+                    #Numbers for A-K-Inboard-Headwall : [4, (2,4), 3, 2, 2, 2, 4]
+                    #Numbers for A-K-Outboard-Footwall: [1, (2,4), 1, 2, 2, 2, 2]
+                    #Numbers for P22-Inboard-footwall : [2, (2,4), 2, 1, 2, 2, 1]
+                    #Numbers for P22-Outboard-footwall: [2, (2,4), 2, 1, 2, 2, 3]
+                    #Numbers for P22-Nested           : [1, (2,4), 2, 1, 2, 2, 2]
+                    #Numbers for S-B-Outboard-Footwall: [3, (2,4), 3, 2, 2, 2, 2]
+                    #Numbers for J-M-Outboard-Footwall: [1, (2,4), 3, 2, 2, 2, 4]
+                    #Numbers for J-C-Outboard-Footwall: [2, (2,4), 3, 2, 2, 2, 4]
+                    #Numbers for J-G-Outboard-Footwall: [3, (1,3), 1, 2, 2, 2, 1]
+                    #Numbers for B-L-Outboard-Footwall: [1, (1,3), 1, 2, 2, 2, 4]
+                    #Numbers for B-JH-Inboard-Headwall: [2, (1,3), 1, 1, 1, 2, 4]
+                    #Numbers for K-B-Inboard-Corner   : [1, (2,4), 1, 1, 4, 2, 2]
+                    #Numbers for K-B-Canted-Corner    : [1, (2,4), 1, 1, 4, 2, 2]
+                    #Numbers for Room-1               : [1, (2,4), 3, 2, 2, 2, 2]
+                    #Numbers for Room-2               : [2, (2,4), 3, 4, 2, 2, 1]
+                    #Numbers for Room-3               : [3, (2,4), 2, 2, 2, 2, 1]
+                    #Numbers for Room-4               : [4, (2,4), 1, 2, 2, 2, 3]
+                    
+                    side = []
+                    zone = [find_meter_from_pixel(rect[0][0]), find_meter_from_pixel(rect[0][1]), rect[2]+0.001, find_meter_from_pixel(rect[1][1]), find_meter_from_pixel(rect[1][0])]
+                    if "Toilet" in QR_obj.data.decode("utf-8"):
+                        side = [3]
+                    if "Bed" in QR_obj.data.decode("utf-8"):
+                        side = [2,4]
+                    if "Chair-Patient" in QR_obj.data.decode("utf-8"):
+                        side = [2]
+                    if "Chair-Visitor" in QR_obj.data.decode("utf-8"):
+                        side = [2]
+                    if "Sofa" in QR_obj.data.decode("utf-8"):
+                        side = [2]
+                    if "Couch" in QR_obj.data.decode("utf-8"):
+                        side = [2]
+                    if "Sink-Bath" in QR_obj.data.decode("utf-8"):
+                        side = [2]
+
+                    l = 0.4
+                    if 1 in side:
+                        zone[4] += l
+                        zone[0] += float(l)/2*np.cos(zone[2])
+                        zone[1] += float(l)/2*np.sin(zone[2])
+                    if 2 in side:
+                        zone[3] += l
+                        zone[0] -= float(l)/2*np.sin(zone[2])
+                        zone[1] += float(l)/2*np.cos(zone[2])
+                    if 3 in side:
+                        zone[4] += l
+                        zone[0] -= float(l)/2*np.cos(zone[2])
+                        zone[1] -= float(l)/2*np.sin(zone[2])
+                    if 4 in side:
+                        zone[3] += l
+                        zone[0] += float(l)/2*np.sin(zone[2])
+                        zone[1] -= float(l)/2*np.cos(zone[2])
+                    corners_sitting = Polygon([[zone[0]-float(zone[4])/2*np.cos(zone[2])-float(zone[3])/2*np.sin(zone[2]),zone[1]-float(zone[4])/2*np.sin(zone[2])+float(zone[3])/2*np.cos(zone[2])],
+                                                [zone[0]-float(zone[4])/2*np.cos(zone[2])+float(zone[3])/2*np.sin(zone[2]),zone[1]-float(zone[4])/2*np.sin(zone[2])-float(zone[3])/2*np.cos(zone[2])],
+                                                [zone[0]+float(zone[4])/2*np.cos(zone[2])+float(zone[3])/2*np.sin(zone[2]),zone[1]+float(zone[4])/2*np.sin(zone[2])-float(zone[3])/2*np.cos(zone[2])],
+                                                [zone[0]+float(zone[4])/2*np.cos(zone[2])-float(zone[3])/2*np.sin(zone[2]),zone[1]+float(zone[4])/2*np.sin(zone[2])+float(zone[3])/2*np.cos(zone[2])] ])
 
                     if "Toilet" in QR_obj.data.decode("utf-8"):
-                        sitting_zones["Toilet"] = [find_meter_from_pixel(rect[0][0]), find_meter_from_pixel(rect[0][1]), rect[2]+0.001, find_meter_from_pixel(rect[1][1]), find_meter_from_pixel(rect[1][0]), [3]]
-                    if "Bed" in QR_obj.data.decode("utf-8"):
-                        sitting_zones["Bed"] = [find_meter_from_pixel(rect[0][0]),find_meter_from_pixel(rect[0][1]), rect[2]+0.001, find_meter_from_pixel(rect[1][1]), find_meter_from_pixel(rect[1][0]), [2,4]]
-                    if "Chair-Patient" in QR_obj.data.decode("utf-8"):
-                        sitting_zones["Chair-Patient"] = [find_meter_from_pixel(rect[0][0]),find_meter_from_pixel(rect[0][1]), rect[2]+0.001, find_meter_from_pixel(rect[1][1]), find_meter_from_pixel(rect[1][0]), [2]]
-                    if "Chair-Visitor" in QR_obj.data.decode("utf-8"):
-                        sitting_zones["Chair-Visitor"] = [find_meter_from_pixel(rect[0][0]),find_meter_from_pixel(rect[0][1]), rect[2]+0.001, find_meter_from_pixel(rect[1][1]), find_meter_from_pixel(rect[1][0]), [2]]
-                    if "Sofa" in QR_obj.data.decode("utf-8"):
-                        sitting_zones["Sofa"] = [find_meter_from_pixel(rect[0][0]), find_meter_from_pixel(rect[0][1]), rect[2]+0.001, find_meter_from_pixel(rect[1][0]), find_meter_from_pixel(rect[1][1]), [2]]
-                    if "Couch" in QR_obj.data.decode("utf-8"):
-                        sitting_zones["Couch"] = [find_meter_from_pixel(rect[0][0]), find_meter_from_pixel(rect[0][1]), rect[2]+0.001, find_meter_from_pixel(rect[1][1]), find_meter_from_pixel(rect[1][0]), [2]]
-            cv2.drawContours(mask,[obj],0,(200,200,0),2)
+                        sample_zones["Toilet"] = corners_sitting
+                    elif "Bed" in QR_obj.data.decode("utf-8"):
+                        sample_zones["Bed"] = corners_sitting
+                    elif "Chair-Patient" in QR_obj.data.decode("utf-8"):
+                        sample_zones["Chair-Patient"] = corners_sitting
+                    elif "Chair-Visitor" in QR_obj.data.decode("utf-8"):
+                        sample_zones["Chair-Visitor"] = corners_sitting
+                    elif "Sofa" in QR_obj.data.decode("utf-8"):
+                        sample_zones["Sofa"] = corners_sitting
+                    elif "Couch" in QR_obj.data.decode("utf-8"):
+                        sample_zones["Couch"] = corners_sitting
+                    elif "Sink-Bath" in QR_obj.data.decode("utf-8"):
+                        sample_zones["Sink-Bath"] = corners_sitting
 
-    img = ~mask
-    colored_house_resized = cv2.resize(img, (1500, 1000))
+            # cv2.drawContours(mask,[obj],0,(200,200,0),2)
+    # img = ~mask
+    # colored_house_resized = cv2.resize(img, (1500, 1000))
     # cv2.imshow('Objects', colored_house_resized)
     # cv2.waitKey()
-    # for obj in assigned_objects:
-    #     cv2.putText(img, obj[3], (int(obj[0][0])-100, int(obj[0][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,0), 3, cv2.LINE_AA)
-    return assigned_objects, sitting_zones, doors, lights, img
+
+    return assigned_objects, sample_zones, doors, lights, img
 
 def find_QR_center(obj):
+	print("here")
+	print(obj)
 	center_x = float(sum([obj.polygon[i].x for i in range(4)]))/4
 	center_y = float(sum([obj.polygon[i].y for i in range(4)]))/4
 	return (center_x,center_y)
@@ -286,8 +336,8 @@ def read_blueprint(image_file_name, library_file_name):
 
 	decodedObjects = decode(img)
 
-	objects, sitting_zones, doors, lights, detected_objects = find_objects(img.copy(), decodedObjects, object_library)
+	objects, sample_zones, doors, lights, detected_objects = find_objects(img.copy(), decodedObjects, object_library)
 	detected_objects_resized = cv2.resize(detected_objects, (1500, 1000))
 
 	walls = detect_walls(img)
-	return rooms, objects, sitting_zones, walls, doors, lights
+	return rooms, objects, sample_zones, walls, doors, lights
