@@ -18,9 +18,8 @@ def OptPath_patient2(state_s, state_f, v_max, obstacles, n, assistive_device):
     Patient_PathPlanner = Model("Patient_path")
     Patient_PathPlanner.reset(0)
     # Create variables
-    n =20
     Patient_PathPlanner.setParam("TimeLimit", 30.0);
-    Patient_PathPlanner.setParam('OutputFlag', 0)
+    # Patient_PathPlanner.setParam('OutputFlag', 0)
     states = Patient_PathPlanner.addVars(n, 2, lb=0, ub=10, vtype=GRB.CONTINUOUS, name="states")
     dstates = Patient_PathPlanner.addVars(n-1, 2, lb=-5, ub=5, vtype=GRB.CONTINUOUS, name="dstates")
     u = Patient_PathPlanner.addVars(len(obstacles), n+1, 4, lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.BINARY, name="u")
@@ -43,6 +42,16 @@ def OptPath_patient2(state_s, state_f, v_max, obstacles, n, assistive_device):
         for i in range(0,n):
             Patient_PathPlanner.addConstr(sum(u[n_obs, i, ii] for ii in range(0, 4)) >= 1)
 
+    startValues = [[],[]]
+    for j in range(n):
+        startValues[0].append(j*float(state_f[0]-state_s[0])/(n-1)+state_s[0])
+        startValues[1].append(j*float(state_f[1]-state_s[1])/(n-1)+state_s[1])
+    print("startValues")
+    print(startValues)
+    for i in range(2):
+        for j in range(n):
+            states[j,i].start = startValues[i][j]
+
     Patient_PathPlanner.optimize()
     print(Patient_PathPlanner.Status)
     path = []
@@ -60,6 +69,8 @@ def OptPath_patient2(state_s, state_f, v_max, obstacles, n, assistive_device):
             w = (new_phi-phi[-1])/dt
             phi.append(new_phi)
             path.append([states[i,0].x, states[i,1].x, phi[-1], v, w])
+    print("path")
+    print(path)
 	# rbf_plot(t1, n, n_rbf, dt, epsilon, we, phi_sum)
 
     return cost, path, Patient_PathPlanner.Status

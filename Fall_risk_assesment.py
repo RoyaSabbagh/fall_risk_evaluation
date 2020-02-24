@@ -87,12 +87,17 @@ class FallRiskAssesment():
 					self.occupied[row, col] = 1
 
 	def findFactors(self, grid):
+		valid_point = False
 		gridCoordinate = self.grid2meter(grid)
 		gridPoint = Point(gridCoordinate)
-		self.scores_support[grid[0],grid[1]] = copy.deepcopy(self.closestSupportDistance_effect(gridPoint)) # Adding the effect of ESP on this grid.
-		self.scores_floor[grid[0],grid[1]] = copy.deepcopy(self.floor_effect(grid)) # Adding the effect of ESP on this grid.
-		self.scores_light[grid[0],grid[1]] = copy.deepcopy(self.lighting_effect(gridPoint)) # Adding the effect of lighting on this grid.
-		self.scores_door[grid[0],grid[1]] = copy.deepcopy(self.door_passing_effect(gridPoint)) # Adding the effect of door passing on this grid.
+		for room in self.env.rooms:
+			if gridPoint.within(room.polygon) == 1:
+				valid_point = True
+		if valid_point:
+			self.scores_support[grid[0],grid[1]] = copy.deepcopy(self.closestSupportDistance_effect(gridPoint)) # Adding the effect of ESP on this grid.
+			self.scores_floor[grid[0],grid[1]] = copy.deepcopy(self.floor_effect(grid)) # Adding the effect of ESP on this grid.
+			self.scores_light[grid[0],grid[1]] = copy.deepcopy(self.lighting_effect(gridPoint)) # Adding the effect of lighting on this grid.
+			self.scores_door[grid[0],grid[1]] = copy.deepcopy(self.door_passing_effect(gridPoint)) # Adding the effect of door passing on this grid.
 
 	def floor_effect(self,grid):
 		""" This function calculates the effect of floor type for a given grid. First it is initialized by the value
@@ -109,10 +114,7 @@ class FallRiskAssesment():
 
 	def door_passing_effect(self, gridPoint):
 		""" This function calculates the effect of door passing for a given grid."""
-		risk = 0
-		for room in self.env.rooms:
-			if gridPoint.within(room.polygon) == 1:
-				risk = 1
+		risk = 1
 		for door in self.env.doors:
 			if gridPoint.within(door.polygon) == True:
 				risk = float(1)/door.support
@@ -121,10 +123,7 @@ class FallRiskAssesment():
 	def lighting_effect(self, gridPoint):
 		""" This function calculates the effect of lighting for a given grid."""
 		risk = 1
-		light_intensity = 0
-		for room in self.env.rooms:
-			if gridPoint.within(room.polygon) == 1:
-				light_intensity = 1
+		light_intensity = 1
 		for light in self.env.lights:
 			if self.in_the_same_room(light.point, gridPoint):
 				dist = self.distance(light.point, gridPoint)
@@ -142,10 +141,7 @@ class FallRiskAssesment():
 
 	def closestSupportDistance_effect(self, gridPoint):
 		""" This function calculates the effect of ESPs for a given grid. """
-		risk = 0
-		for room in self.env.rooms:
-			if gridPoint.within(room.polygon) == 1:
-				risk = 1
+		risk = 1
 		min_dist = self.theta_d[2]
 		support_type = 1
 		for support in self.ESP:
@@ -267,7 +263,7 @@ class FallRiskAssesment():
 			TrajectoryScores.append(PointScore)
 			TrajectoryPoints.append([point,PointScore])
 		if plot:
-			self.plotTrajDist(TrajectoryScores, trajectory, counter)
+			self.plotTrajDist(TrajectoryScores, trajectory, counter, background_filename, traj_png_filenames, traj_pdf_filenames)
 
 		return TrajectoryPoints
 

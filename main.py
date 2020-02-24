@@ -20,15 +20,14 @@ if __name__ == '__main__':
 
 
     # Setup parameters for evaluation
-    unit_size_m = 0.2
-    num_rows = 50
-    num_cols = 50
+    unit_size_m = 0.1
+    num_rows = 100
+    num_cols = 100
 
     # Setup parameters used for motion prediction and evaluation
-    weights = [0.7, 0.3]
     v = [1.2, 0.3] # maximum linear velocity = [mu, sigma]
     w = [1, 0.3] # maximum angular velocity = [mu, sigma]
-    num_points = 50
+    num_points = 10
 
     # Setup scenarios within the room
     num_trials = 36

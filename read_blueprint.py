@@ -236,7 +236,7 @@ def find_objects(img, decodedObjects, object_library, noise_removal_threshold=50
                     #Numbers for Room-2               : [2, (2,4), 3, 4, 2, 2, 1]
                     #Numbers for Room-3               : [3, (2,4), 2, 2, 2, 2, 1]
                     #Numbers for Room-4               : [4, (2,4), 1, 2, 2, 2, 3]
-                    
+
                     side = []
                     zone = [find_meter_from_pixel(rect[0][0]), find_meter_from_pixel(rect[0][1]), rect[2]+0.001, find_meter_from_pixel(rect[1][1]), find_meter_from_pixel(rect[1][0])]
                     if "Toilet" in QR_obj.data.decode("utf-8"):
@@ -252,7 +252,7 @@ def find_objects(img, decodedObjects, object_library, noise_removal_threshold=50
                     if "Couch" in QR_obj.data.decode("utf-8"):
                         side = [2]
                     if "Sink-Bath" in QR_obj.data.decode("utf-8"):
-                        side = [2]
+                        side = [1]
 
                     l = 0.4
                     if 1 in side:
@@ -313,15 +313,30 @@ def detect_walls(img):
 	img_dilation2 = cv2.dilate(img, kernel, iterations=1)
 	edges = cv2.Canny(img_dilation,0,1000,apertureSize = 3)
 	minLineLength=10
+
 	lines_list = []
-	lines = cv2.HoughLinesP(image=edges,rho=1,theta=0.0005, threshold=50,lines=np.array([]), minLineLength=minLineLength,maxLineGap=200)
+	lines = cv2.HoughLinesP(image=edges,rho=0.8,theta=0.0005, threshold=150,lines=np.array([]), minLineLength=minLineLength,maxLineGap=200)
+
+	duplicates = []
+	for i in range(len(lines)):
+	       for j in range(i+1,len(lines)):
+	              if (lines[i][0][0]-lines[j][0][0])**2 < 2500 and (lines[i][0][1]-lines[j][0][1])**2 < 2500 and  (lines[i][0][2]-lines[j][0][2])**2 < 2500 and  (lines[i][0][3]-lines[j][0][3])**2 < 2500:
+	                     if i not in duplicates:
+	                            duplicates.append(i)
+	lines = np.delete(lines, duplicates, 0)
+	for line in lines:
+            lines_list.append(find_meter_from_pixel(line))
+	# print("len(lines_list):")
+	# print(len(lines_list))
 	a,b,c = lines.shape
 	for i in range(a):
 	       cv2.line(img_dilation2, (lines[i][0][0], lines[i][0][1]), (lines[i][0][2], lines[i][0][3]), (100, 200, 20), 3, cv2.LINE_AA)
 	img_dilation2 = cv2.resize(img_dilation2, (1500, 1000))
-	for line in lines:
-	       lines_list.append(find_meter_from_pixel(line))
-	#still need to merge lines
+	# cv2.imshow('img_dilation2', img_dilation2)
+	# cv2.waitKey()
+	# print(lines)
+
+	#still need to merge lines?
 	return lines_list
 
 
